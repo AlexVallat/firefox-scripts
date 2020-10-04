@@ -6,7 +6,7 @@ const {xPref} = ChromeUtils.import('chrome://userchromejs/content/xPref.jsm');
 let UC = {};
 
 let _uc = {
-  ALWAYSEXECUTE: 'rebuild_userChrome.uc.js',
+  ALWAYSEXECUTE: ['rebuild_userChrome.uc.js', 'userScriptsPanelMenu.uc.js'],
   BROWSERCHROME: 'chrome://browser/content/browser.xhtml',
   PREF_ENABLED: 'userChromeJS.enabled',
   PREF_SCRIPTSDISABLED: 'userChromeJS.scriptsDisabled',

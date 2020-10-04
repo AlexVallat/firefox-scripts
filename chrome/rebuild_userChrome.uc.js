@@ -37,7 +37,7 @@
         event.target.appendChild(this.elBuilder(document, 'menuseparator'));
 
       Object.values(_uc.scripts).forEach(script => {
-        if (script.filename === _uc.ALWAYSEXECUTE) {
+        if (_uc.ALWAYSEXECUTE.includes(script.filename)) {
           return;
         }
 
@@ -199,7 +199,7 @@
 
       xPref.addListener(_uc.PREF_ENABLED, function (value, prefPath) {
         Object.values(_uc.scripts).forEach(script => {
-          if (script.filename == _uc.ALWAYSEXECUTE)
+          if (_uc.ALWAYSEXECUTE.includes(script.filename))
             return;
           if (value && script.isEnabled && !_uc.everLoaded.includes(script.id)) {
             UC.rebuild.install(script);
