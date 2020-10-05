@@ -91,7 +91,7 @@ let _uc = {
   everLoaded: [],
   
   loadScript: function (script, win) {
-    if (!script.regex.test(win.location.href) || (script.filename != this.ALWAYSEXECUTE && !script.isEnabled)) {
+    if (!script.regex.test(win.location.href) || (!this.ALWAYSEXECUTE.includes(script.filename) && !script.isEnabled)) {
       return;
     }
 
@@ -197,7 +197,9 @@ UserChrome_js.prototype = {
           _uc.loadScript(script, window);
         });
       } else if (!UC.rebuild) {
-        _uc.loadScript(_uc.scripts[_uc.ALWAYSEXECUTE], window);
+        Object.values(_uc.ALWAYSEXECUTE).forEach(alwaysExecute => {
+			_uc.loadScript(_uc.scripts[alwaysExecute], window);
+		});
       }
     }
   }
