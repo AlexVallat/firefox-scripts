@@ -43,8 +43,8 @@
 
         mi = event.target.appendChild(this.elBuilder(document, 'menuitem', {
           label: script.name ? script.name : script.filename,
-          oncommand: 'UC.rebuild.toggleScript(_uc.scripts[this.filename]);',
-          onclick: 'UC.rebuild.clickScriptMenu(event);',
+          oncommand: 'UC.UserScriptsManagement.toggleScript(_uc.scripts[this.filename]);',
+          onclick: 'UC.UserScriptsManagement.clickScriptMenu(event);',
           type: 'checkbox',
           checked: script.isEnabled,
           class: 'userChromejs_script',
@@ -53,77 +53,13 @@
         mi.filename = script.filename;
         let homepage = script.homepageURL || script.downloadURL || script.updateURL || script.reviewURL;
         if (homepage)
-          mi.setAttribute('homeURL', homepage);
-        mi.setAttribute('tooltiptext', `
-          Left-Click: Enable/Disable
-          Middle-Click: Enable/Disable and keep this menu open
-          Right-Click: Edit
-          Ctrl + Left-Click: Reload Script
-          Ctrl + Middle-Click: Open Homepage
-          Ctrl + Right-Click: Uninstall
-        `.replace(/^\n| {2,}/g, '') + (script.description ? '\nDescription: ' + script.description : '')
-                                    + (homepage ? '\nHomepage: ' + homepage : ''));
+              mi.setAttribute('homeURL', homepage);
+          mi.setAttribute('tooltiptext', UC.UserScriptsManagement.getScriptTooltip(script));
 
         event.target.appendChild(mi);
       });
 
       document.getElementById('showToolsMenu').setAttribute('label', 'Switch to ' + (this.showToolButton ? 'button in Navigation Bar' : 'item in Tools Menu'));
-    },
-
-    clickScriptMenu: function (event) {
-      let script = _uc.scripts[event.target.filename];
-      if (event.button == 1) {
-        if (event.ctrlKey) {
-          let url = event.target.getAttribute('homeURL');
-          if (url) {
-            gBrowser.addTab(url, {triggeringPrincipal: Services.scriptSecurityManager.createNullPrincipal({})});
-          }
-        } else {
-          this.toggleScript(script);
-          event.target.setAttribute('checked', script.isEnabled);
-        }
-      } else if (event.button == 2) {
-        if (event.ctrlKey) {
-          this.uninstall(script);
-        } else {
-          this.launchEditor(script);
-        }
-        closeMenus(event.target);
-      } else if (event.button == 0 && event.ctrlKey) {
-        this.toggleScript(script);
-      }
-    },
-
-    launchEditor: function (script) {
-      let editor = xPref.get('view_source.editor.path');
-      if (!editor) {
-        editor = prompt('Editor not defined. Paste the full path of your text editor', 'C:\\WINDOWS\\system32\\notepad.exe');
-        if (editor)
-          xPref.set('view_source.editor.path', editor);
-      }
-      try {
-        let appfile = Cc['@mozilla.org/file/local;1'].createInstance(Ci.nsIFile);
-        appfile.initWithPath(editor);
-        let process = Cc['@mozilla.org/process/util;1'].createInstance(Ci.nsIProcess);
-        process.init(appfile);
-        process.run(false, [script.file.path], 1, {});
-      } catch {
-        alert('Can\'t open the editor. Go to about:config and set editor\'s path in view_source.editor.path.');
-      }
-    },
-
-    toggleScript: function (script) {
-      if (script.isEnabled) {
-        xPref.set(_uc.PREF_SCRIPTSDISABLED, script.filename + ',' + xPref.get(_uc.PREF_SCRIPTSDISABLED));
-      } else {
-        xPref.set(_uc.PREF_SCRIPTSDISABLED, xPref.get(_uc.PREF_SCRIPTSDISABLED).replace(new RegExp('^' + script.filename + ',|,' + script.filename), ''));
-      }
-
-      if (script.isEnabled && !_uc.everLoaded.includes(script.id)) {
-        this.install(script);
-      } else if (script.isRunning && !!script.shutdown) {
-        this.shutdown(script);
-      }
     },
 
     toggleUI: function (byaboutconfig = false, startup = false) {
@@ -142,42 +78,6 @@
         }
       });
     },
-
-    install: function (script) {
-      script = _uc.getScriptData(script.file);
-      Services.obs.notifyObservers(null, 'startupcache-invalidate');
-      _uc.windows((doc, win, loc) => {
-        if (win._uc && script.regex.test(loc.href)) {
-          _uc.loadScript(script, win);
-        }
-      }, false);
-    },
-
-    uninstall: function(script) {
-      if (!confirm('Do you want to uninstall this script? The file will be deleted.'))
-        return;
-
-      this.shutdown(script);
-      script.file.remove(false);
-      xPref.set(_uc.PREF_SCRIPTSDISABLED, xPref.get(_uc.PREF_SCRIPTSDISABLED).replace(new RegExp('^' + script.filename + ',|,' + script.filename), ''));
-    },
-
-    shutdown: function (script) {
-      if (script.shutdown) {
-        _uc.windows((doc, win, loc) => {
-          if (script.regex.test(loc.href)) {
-            try {
-              eval(script.shutdown);
-            } catch (ex) {
-              console.error(ex);
-            }
-            if (script.onlyonce)
-              return true;
-          }
-        }, false);
-        script.isRunning = false;
-      }
-    },
     
     elBuilder: function (doc, tag, props) {
       let el = doc.createXULElement(tag);
@@ -195,18 +95,6 @@
 
       xPref.addListener(this.PREF_TOOLSBUTTON, function (value, prefPath) {
         UC.rebuild.toggleUI(true);
-      });
-
-      xPref.addListener(_uc.PREF_ENABLED, function (value, prefPath) {
-        Object.values(_uc.scripts).forEach(script => {
-          if (_uc.ALWAYSEXECUTE.includes(script.filename))
-            return;
-          if (value && script.isEnabled && !_uc.everLoaded.includes(script.id)) {
-            UC.rebuild.install(script);
-          } else if (!value && script.isRunning && !!script.shutdown) {
-            UC.rebuild.shutdown(script);
-          }
-        });
       });
 
       CustomizableUI.createWidget({
@@ -240,7 +128,7 @@
             class: 'menuitem-iconic',
             flex: '1',
             style: 'list-style-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABe0lEQVQ4jc3N2ytDARwH8J83/wRKefU3zFBCSnlQSnkQpSiFFLk8OMQmxLBZLos2I7ckM3PmMmEredF23Ma2GrPjkuFsvh7mstTqnDff+jx+v1+ifxEZ43zPYFyIld3FHWYxzlRRA5mdXFi3c4vpvbuo3TvU6z2CnHEKf4djRd9bLYnyDldkYtuPqZ1b0TIYF2StlkTK6eaQ080ht+eLgkPeH/nflGc/8hRRVNB7BuVaAGPWILRsDCsfl4bl0bMaQGHfOaho4AL9pns0GPyo04vTYPCjz3SP4sELUInqEkObPNoXA5IMmoMoHbkClWncUG8/QLnOS6K2PqJc6wZVjl9jyvYMtfVJEp3tGVWTN6Bq3Q2M9hBmDl4kMTpCqJ32gOr1XmHp+BUrJ2+SLB2/onHWK1DLvG95lOU/Nk4FbLnCcbHcL/OpgFGWj7Qt+AxUo7an12qOHM1Gb6R5zgcxmozecLVq31YxvJ9GRJRARElElExEKSIlf3USPgHT/mSv7iPTOwAAAABJRU5ErkJggg==)',
-            oncommand: 'Services.dirsvc.get(\'UChrm\', Ci.nsIFile).launch();'
+            oncommand: 'UC.UserScriptsManagement.launchChromeFolder()'
           });
           mg.appendChild(mi1);
 
@@ -248,7 +136,7 @@
             id: 'userChromejs_restartApp',
             tooltiptext: 'Restart Firefox',
             style: 'list-style-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAB20lEQVQ4jY2Tv2sUURDHZ/bX7eW0ChJBRFKIRRCRIEHuzVvfrYmkSiFXSSoLERERy5B/wcIuqG9mN5VecUWwCqkOEQsLKysLsQgSxEJEgsVYeJfsHXuY4tvN9zMzzHxBVXFS8Gy1kRaZi8U+iCV7HIq73Xqez9XWThoDsRvg6QDY6Ji8+RMK9dLSztcCoMhnkc27YxPth0I7oVAPhT5WYD9ScfkYALYWYxQa/OvU/h5ztg5bi3G1U2vbXUFPb4fT/EzELRwBYraPRvSE7eW6XVUV4en1JjLtARtFoYGqInRfd0Nk8wXYaCzZ/WnmkZrengc2v4GNNr1bglPiFoaj/5orV1r/A6gqhkI9YKMB0yY0OF9GsV/jIts9iVlVMeJscwhgOKmpqoDpGNDg5YuB0HYg9lUotINCuxFn/bN+9czUFZj6wEYDsRsQle7W+NPQ/uhEdUpLOw/cPgQ2OlPcvAoJZ90qICnc2tQzlist9GYAbDRk2lNVhFDs3YmXPUjkxp3JR2qWbgk9fRj9S+Olu6SqCJHYJ+DN5xnOryHT+wrsG7J9g0x9ZPup2iAS1z6aKi076+mLzoVRmKJpYeL2YSC2aBadc1PTOB7n3AXe3guYHiberZ0u8tm62r99Gyd0lo7sIAAAAABJRU5ErkJggg==)',
-            oncommand: 'Services.appinfo.invalidateCachesOnRestart();BrowserUtils.restartApplication();'
+            oncommand: 'UC.UserScriptsManagement.restartFirefox()'
           });
           mg.appendChild(tb);
 

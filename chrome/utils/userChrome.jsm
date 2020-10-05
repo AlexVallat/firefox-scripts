@@ -1,7 +1,12 @@
 let EXPORTED_SYMBOLS = [];
 
 const {Services} = ChromeUtils.import('resource://gre/modules/Services.jsm');
+const {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 const {xPref} = ChromeUtils.import('chrome://userchromejs/content/xPref.jsm');
+
+XPCOMUtils.defineLazyModuleGetters(this, {
+    BrowserUtils: "resource://gre/modules/BrowserUtils.jsm"
+});
 
 let UC = {};
 
@@ -171,9 +176,141 @@ if (xPref.get(_uc.PREF_SCRIPTSDISABLED) === undefined) {
   xPref.set(_uc.PREF_SCRIPTSDISABLED, '', true);
 }
 
+UC.UserScriptsManagement = {
+    init: function () {
+        xPref.addListener(_uc.PREF_ENABLED, function (value, prefPath) {
+            Object.values(_uc.scripts).forEach(script => {
+                if (_uc.ALWAYSEXECUTE.includes(script.filename))
+                    return;
+                if (value && script.isEnabled && !_uc.everLoaded.includes(script.id)) {
+                    UC.UserScriptsManagement.install(script);
+                } else if (!value && script.isRunning && !!script.shutdown) {
+                    UC.UserScriptsManagement.shutdown(script);
+                }
+            });
+        });
+    },
+
+    clickScriptMenu: function (event) {
+        let script = _uc.scripts[event.target.filename];
+        if (event.button === 1) {
+            if (event.ctrlKey) {
+                let url = event.target.getAttribute('homeURL');
+                if (url) {
+                    gBrowser.addTab(url, { triggeringPrincipal: Services.scriptSecurityManager.createNullPrincipal({}) });
+                }
+            } else {
+                this.toggleScript(script);
+                event.target.setAttribute('checked', script.isEnabled);
+            }
+        } else if (event.button === 2) {
+            if (event.ctrlKey) {
+                this.uninstall(script);
+            } else {
+                this.launchEditor(script);
+            }
+            closeMenus(event.target);
+        } else if (event.button === 0 && event.ctrlKey) {
+            this.toggleScript(script);
+        }
+    },
+
+    getScriptTooltip: function (script) {
+        const homepage = script.homepageURL || script.downloadURL || script.updateURL || script.reviewURL;
+
+        return `
+          Left-Click: Enable/Disable
+          Middle-Click: Enable/Disable and keep this menu open
+          Right-Click: Edit
+          Ctrl + Left-Click: Reload Script
+          Ctrl + Middle-Click: Open Homepage
+          Ctrl + Right-Click: Uninstall
+        `.replace(/^\n| {2,}/g, '') + (script.description ? '\nDescription: ' + script.description : '')
+            + (homepage ? '\nHomepage: ' + homepage : '');
+    },
+
+    launchChromeFolder: function () {
+        Services.dirsvc.get('UChrm', Ci.nsIFile).launch();
+    },
+
+    restartFirefox: function () {
+        Services.appinfo.invalidateCachesOnRestart();
+        BrowserUtils.restartApplication();
+    },
+
+    launchEditor: function (script) {
+        let editor = xPref.get('view_source.editor.path');
+        if (!editor) {
+            editor = prompt('Editor not defined. Paste the full path of your text editor', 'C:\\WINDOWS\\system32\\notepad.exe');
+            if (editor)
+                xPref.set('view_source.editor.path', editor);
+        }
+        try {
+            let appfile = Cc['@mozilla.org/file/local;1'].createInstance(Ci.nsIFile);
+            appfile.initWithPath(editor);
+            let process = Cc['@mozilla.org/process/util;1'].createInstance(Ci.nsIProcess);
+            process.init(appfile);
+            process.run(false, [script.file.path], 1, {});
+        } catch {
+            alert('Can\'t open the editor. Go to about:config and set editor\'s path in view_source.editor.path.');
+        }
+    },
+
+    toggleScript: function (script) {
+        if (script.isEnabled) {
+            xPref.set(_uc.PREF_SCRIPTSDISABLED, script.filename + ',' + xPref.get(_uc.PREF_SCRIPTSDISABLED));
+        } else {
+            xPref.set(_uc.PREF_SCRIPTSDISABLED, xPref.get(_uc.PREF_SCRIPTSDISABLED).replace(new RegExp('^' + script.filename + ',|,' + script.filename), ''));
+        }
+
+        if (script.isEnabled && !_uc.everLoaded.includes(script.id)) {
+            this.install(script);
+        } else if (script.isRunning && !!script.shutdown) {
+            this.shutdown(script);
+        }
+    },
+
+    install: function (script) {
+        script = _uc.getScriptData(script.file);
+        Services.obs.notifyObservers(null, 'startupcache-invalidate');
+        _uc.windows((doc, win, loc) => {
+            if (win._uc && script.regex.test(loc.href)) {
+                _uc.loadScript(script, win);
+            }
+        }, false);
+    },
+
+    uninstall: function (script) {
+        if (!confirm('Do you want to uninstall this script? The file will be deleted.'))
+            return;
+
+        this.shutdown(script);
+        script.file.remove(false);
+        xPref.set(_uc.PREF_SCRIPTSDISABLED, xPref.get(_uc.PREF_SCRIPTSDISABLED).replace(new RegExp('^' + script.filename + ',|,' + script.filename), ''));
+    },
+
+    shutdown: function (script) {
+        if (script.shutdown) {
+            _uc.windows((doc, win, loc) => {
+                if (script.regex.test(loc.href)) {
+                    try {
+                        eval(script.shutdown);
+                    } catch (ex) {
+                        console.error(ex);
+                    }
+                    if (script.onlyonce)
+                        return true;
+                }
+            }, false);
+            script.isRunning = false;
+        }
+    },
+};
+
 function UserChrome_js() {
-  _uc.getScripts();
-  Services.obs.addObserver(this, 'chrome-document-global-created', false);
+    _uc.getScripts();
+    UC.UserScriptsManagement.init();
+    Services.obs.addObserver(this, 'chrome-document-global-created', false);
 }
 
 UserChrome_js.prototype = {
@@ -196,10 +333,13 @@ UserChrome_js.prototype = {
         Object.values(_uc.scripts).forEach(script => {
           _uc.loadScript(script, window);
         });
-      } else if (!UC.rebuild) {
+      } else {
         Object.values(_uc.ALWAYSEXECUTE).forEach(alwaysExecute => {
-			_uc.loadScript(_uc.scripts[alwaysExecute], window);
-		});
+            const script = _uc.scripts[alwaysExecute];
+            if (script) {
+                _uc.loadScript(script, window);
+            }
+        });
       }
     }
   }

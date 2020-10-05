@@ -23,10 +23,10 @@ UC.userScriptsPanelMenu = {
             {
                 const subviewBody = doc.createXULElement("vbox");
                 subviewBody.className = "panel-subview-body";
-                subviewBody.appendChild(this.createMenuItem("openChrome", "url(chrome://browser/skin/folder.svg)", "Open chrome directory", "Services.dirsvc.get('UChrm', Ci.nsIFile).launch()"));
-                subviewBody.appendChild(this.createMenuItem("restart", "url(chrome://browser/skin/reload.svg)", "Restart Firefox", "Services.appinfo.invalidateCachesOnRestart();BrowserUtils.restartApplication();"));
+                subviewBody.appendChild(this.createMenuItem(doc, "openChrome", "url(chrome://browser/skin/folder.svg)", "Open chrome directory", "UC.UserScriptsManagement.launchChromeFolder()"));
+                subviewBody.appendChild(this.createMenuItem(doc, "restart", "url(chrome://browser/skin/reload.svg)", "Restart Firefox", "UC.UserScriptsManagement.restartFirefox()"));
                 subviewBody.appendChild(doc.createXULElement("toolbarseparator"));
-                const enabledMenuItem = this.createMenuItem("enabled", null, "Enabled", "xPref.set(_uc.PREF_ENABLED, !!this.checked)");
+                const enabledMenuItem = this.createMenuItem(doc, "enabled", null, "Enabled", "xPref.set(_uc.PREF_ENABLED, !!this.checked)");
                 enabledMenuItem.type = "checkbox";
                 subviewBody.appendChild(enabledMenuItem);
                 const scriptsSeparator = doc.createXULElement("toolbarseparator");
@@ -60,14 +60,15 @@ UC.userScriptsPanelMenu = {
         }
 
         // Populate with new entries
+        let scriptMenuItems = [];
         Object.values(_uc.scripts).forEach(script => {
             if (_uc.ALWAYSEXECUTE.includes(script.filename)) {
                 return;
             }
 
-            let scriptMenuItem = UC.userScriptsPanelMenu.createMenuItem(null, null, script.name ? script.name : script.filename, "UC.rebuild.toggleScript(_uc.scripts[this.filename]);");
-            scriptMenuItem.setAttribute("onclick", "UC.rebuild.clickScriptMenu(event);");
-            scriptMenuItem.type = "checkxbox";
+            let scriptMenuItem = UC.userScriptsPanelMenu.createMenuItem(scriptsSeparator.ownerDocument, null, null, script.name ? script.name : script.filename, "UC.UserScriptsManagement.toggleScript(_uc.scripts[this.filename]);");
+            scriptMenuItem.setAttribute("onclick", "UC.UserScriptsManagement.clickScriptMenu(event);");
+            scriptMenuItem.type = "checkbox";
             scriptMenuItem.checked = script.isEnabled;
             scriptMenuItem.setAttribute("restartless", !!script.shutdown);
             scriptMenuItem.filename = script.filename;
@@ -75,18 +76,11 @@ UC.userScriptsPanelMenu = {
             if (homepage) {
                 scriptMenuItem.setAttribute('homeURL', homepage);
             }
-            scriptMenuItem.setAttribute('tooltiptext', `
-          Left-Click: Enable/Disable
-          Middle-Click: Enable/Disable and keep this menu open
-          Right-Click: Edit
-          Ctrl + Left-Click: Reload Script
-          Ctrl + Middle-Click: Open Homepage
-          Ctrl + Right-Click: Uninstall
-        `.replace(/^\n| {2,}/g, '') + (script.description ? '\nDescription: ' + script.description : '')
-                + (homepage ? '\nHomepage: ' + homepage : ''));
-
-            scriptsSeparator.parentElement.appendChild(scriptMenuItem);
+            scriptMenuItem.setAttribute('tooltiptext', UC.UserScriptsManagement.getScriptTooltip(script));
+            scriptMenuItems.push(scriptMenuItem);
         });
+
+        scriptsSeparator.parentElement.append(...scriptMenuItems);
 	},
 
     shutdown: function (window) {
@@ -109,8 +103,8 @@ UC.userScriptsPanelMenu = {
         }
     },
 
-    createMenuItem: function (id, icon, label, command) {
-        const menuItem = window.document.createXULElement("toolbarbutton");
+    createMenuItem: function (doc, id, icon, label, command) {
+        const menuItem = doc.createXULElement("toolbarbutton");
         menuItem.className = "subviewbutton subviewbutton-iconic";
         if (id) {
             menuItem.id = "appMenu-userChromeJS-" + id;
