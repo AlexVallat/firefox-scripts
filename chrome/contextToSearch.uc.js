@@ -5,14 +5,13 @@
 // @version         0.6
 // @description     Search context menu entry now sends search to search box
 // @include         main
-// @startup         UC.contextToSearch.startup(win);
 // @shutdown        UC.contextToSearch.shutdown(win);
 // @onlyonce
 // ==/UserScript==
 
 UC.contextToSearch = {
 
-    startup: function (window) {
+    init: function () {
         //Check for navigator:browser
         if (!window.gNavToolbox)
             return;
@@ -41,3 +40,4 @@ UC.contextToSearch = {
         }
     }
 }
+UC.contextToSearch.init();

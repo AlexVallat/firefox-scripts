@@ -29,9 +29,13 @@ UC.extensionOptionsMenu = {
           tooltiptext: 'Extension Options Menu',
           type: 'menu',
           class: 'toolbarbutton-1 chromeclass-toolbar-additional',
-          image: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABaUlEQVQ4y6WTW0sCQRiG/SEpVBDUVVfphbAEhWAlqYhrLWUlER2IIgrqYkEp6SBmudWiFf0SiSCwpAI7bJnprq6H/sTbGhJiEyt28fAN7zfz8DHDaABo/oPqBpovX7j4T1gOS6dNCcYiZbhOSrCHi2hugqNCwskVYNmXbxoSuPkCN3NWhCdahLLGKCfDcSBjOJiHeTeHPr8EyifCwGb9RMF0RIaHl+E+zoMJ5+AM5WALSBjaEWHayqLXm4GR/YB+Iw2iYIKTMB6WwIRE0EER9r0s+r1pGNZT6F55ReeigPb5F7TOPpMFTDCDkUAGA753GFYFdC08QedJEvkR2DbfzuntFBz+1K2ZFdCz9Ii2qQfo3Pck2MoZpVI/AqtXQAXjchIdk3fQMok/Ib6CaS0Z1c8pdlc8pqXjUOF7AqVSxDvQOq7RKERBi/UKdbDVnK3vkQWWS9Si1vstGIyxCqiBquZUXc429BfU+AL9Tqy8Q2Za8AAAAABJRU5ErkJggg==',
-          onclick: 'if (event.button == 1) BrowserAddonUI.openAddonsMgr("addons://list/extension")'
+          image: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAADDklEQVQ4jZWTTWgUZxzGn3c+9p2Z3Z2d3Ul0Q2w2bhP6AdIQgxhMarUgUgUPpZqD0EJPasmhB3vpoZRCvxAtPbUIlhIoFJGCklhq8dCqtWLUasG2NKtp7OZzd2dnd96ZeWfm9dKItKXF3+n5H57f5eFP8BAT2zc8X0j812SIgTgG5bo6syLio69fWTzVaDQE/gWyGizLIqf6OnnCmJxdk0LKkkDkBEYsifcSe/gPFTPfnLy89HDZtm1NWT0+Ge5+VnV9OVvWYHQQpFUfhHAk0trpkt23vX9j/cLo3j1X61X+1ewvrflawrblu9KjDwR5je4z9ACZIoFJHehmGwmn+PmuOykNxpvNVCwv09omL5tsYr3AghNDS9HqA0FWil5IdxJk0g6yhgeNBvBy6dkz05mbrjU3VszIWKOogIjAuACDAtqUPlcA4Nzu0vpeebE0SzpOF6ifdYTEo4A+vqjmr/t5mlnXe6d/gTPkSAGm3gVT92EFFEmdTCgAcEQMSjlqH4jsoaJlls1cptDsu/zx8ccqZzn2p1/Jw4SXUIRJAENVYaZ9NNqaN/Hu5C0FAH7c8Oo7teL6sWJGw7p8GUMm4O78DFNHxrfOnp0+difT7ukvsYFo2YLOFcxUlT/nfmVvAIBiWRaBoe5B0EAz3482AzwKzF0DLOvGwAcHd710/HT9wx+mfmJDPei4W8/xsshJg8bSt98DUJ56+a0tV0PoSCXwOENDA+6FwMp849JY5FKjOTUyPsJHxrekhJCShPi/ybxGsNKxu3j4/fOQVNPeF7YCCD8E3HkssmVUXCConjj/XFkfRsz/2okT4t2ToyUflaZ5s2v0owUAkFq0sB9xDIRBgqaLeOV3VFgNT7Qu3e56OtwJECAOAa8KOC0wJ0ZbLp1ZnV/xwuBTJOxLRNIt0fIkLDlbQf1DPUY9JUlVHY4MhAxRCwh8HTwM0RbOF//4hb9z8e3eHd05/+tCpwpFEEQhQeDFWIZdefLQjfL/CgDg3Jvl7nSOvqgp8TNCENfxxEWk1k5uO/xd6796j8R90UJMv89oFgMAAAAASUVORK5CYII='
         });
+
+        btn.onclick = function(event) {
+          if (event.button == 1)
+            BrowserAddonUI.openAddonsMgr('addons://list/extension');
+        };
 
         let mp = _uc.createElement(doc, 'menupopup', {
           id: 'eom-button-popup',
@@ -42,7 +46,7 @@ UC.extensionOptionsMenu = {
         });
         btn.appendChild(mp);
 
-        mp.addEventListener('popupshowing', UC.extensionOptionsMenu.evalPopulateMenu);
+        mp.addEventListener('popupshowing', UC.extensionOptionsMenu.populateMenu);
 
         return btn;
       }
@@ -52,13 +56,8 @@ UC.extensionOptionsMenu = {
     _uc.sss.loadAndRegisterSheet(this.STYLE.url, this.STYLE.type);
   },
 
-  evalPopulateMenu: function (e) {
-    new e.view.Function('e', `
-      AddonManager.getAddonsByTypes(['extension']).then(addons => UC.extensionOptionsMenu.populateMenu(e, addons));
-    `).call(null, e);
-  },
-
-  populateMenu: function (e, addons) {
+  populateMenu: async function (e) {
+    let addons = await AddonManager.getAddonsByTypes(['extension']);
     let prevState;
     let popup = e.target;
     let doc = e.view.document;
