@@ -8,7 +8,8 @@ ChromeUtils.defineESModuleGetters(this, {
 
 let UC = {
   webExts: new Map(),
-  sidebar: new Map()
+  sidebar: new Map(),
+  sandboxes: new WeakMap()
 };
 
 let _uc = {
@@ -105,7 +106,7 @@ let _uc = {
 
     if (script.onlyonce && script.isRunning) {
       if (script.startup) {
-        eval(script.startup);
+        Cu.evalInSandbox(`(function(script, win){${script.startup}})`, this.getSandbox(win))(script, win);
       }
       return;
     }
@@ -115,7 +116,7 @@ let _uc = {
                                           script.onlyonce ? { window: win } : win);
       script.isRunning = true;
       if (script.startup) {
-        eval(script.startup);
+        Cu.evalInSandbox(`(function(script, win){${script.startup}})`, this.getSandbox(win))(script, win);
       }
       if (!script.shutdown) {
         this.everLoaded.push(script.id);
@@ -123,6 +124,25 @@ let _uc = {
     } catch (ex) {
       Cu.reportError(ex);
     }
+  },
+
+  getSandbox: function (doc) {
+    if (!UC.sandboxes) UC.sandboxes = new WeakMap();
+    let global = Cu.getGlobalForObject(doc);
+    if (UC.sandboxes.has(global)) 
+      return UC.sandboxes.get(global);
+    let sb = Cu.Sandbox(Services.scriptSecurityManager.getSystemPrincipal(), {
+      sandboxPrototype: global,
+      sameZoneAs: global,
+      wantXrays: false,
+      sandboxName: 'UCJS:Sandbox'
+    });
+    UC.sandboxes.set(global, sb);
+    global.addEventListener('unload', () => {
+      UC.sandboxes.delete(global);
+      Cu.nukeSandbox(sb);
+    });
+    return sb;
   },
 
   windows: function (fun, onlyBrowsers = true) {
@@ -152,7 +172,11 @@ let _uc = {
   createElement: function (doc, tag, atts, XUL = true) {
     let el = XUL ? doc.createXULElement(tag) : doc.createElement(tag);
     for (let att in atts) {
-      el.setAttribute(att, atts[att]);
+      if (att.startsWith('on'))
+        el.addEventListener(att.slice(2), typeof atts[att] == "string" ?
+          Cu.evalInSandbox(`(function(event){${atts[att]}})`, this.getSandbox(doc)) : atts[att]);
+      else
+        el.setAttribute(att, atts[att]);
     }
     return el
   }

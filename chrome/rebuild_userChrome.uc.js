@@ -266,7 +266,7 @@ UC.rebuild = {
       _uc.windows((doc, win, loc) => {
         if (script.regex.test(loc.href)) {
           try {
-            eval(script.shutdown);
+            Cu.evalInSandbox(`(function(script, win){${script.shutdown}})`, _uc.getSandbox(win))(script, win);
           } catch (ex) {
             Cu.reportError(ex);
           }
