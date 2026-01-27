@@ -9,10 +9,10 @@
 
 // initially forked from https://web.archive.org/web/20131025160814/http://www.cnblogs.com/ziyunfei/archive/2011/12/15/2289504.html
 
-const { XPCOMUtils } = ChromeUtils.import('resource://gre/modules/XPCOMUtils.jsm');
-XPCOMUtils.defineLazyGetter(this, 'SelectionUtils', function() {
-  let { SelectionUtils } = Cu.import('resource://gre/modules/SelectionUtils.jsm');
-  return SelectionUtils;
+const lazy = {};
+
+ChromeUtils.defineESModuleGetters(lazy, {
+    SelectionUtils: "resource://gre/modules/SelectionUtils.sys.mjs",
 });
 
 UC.MGest = {
@@ -73,7 +73,7 @@ UC.MGest = {
     '1L': {
       name: 'Copy text / Image',
       cmd: function (win) {
-        let selection = SelectionUtils.getSelectionDetails(win).text;
+        let selection = lazy.SelectionUtils.getSelectionDetails(win).text;
         if (selection)
           Cc['@mozilla.org/widget/clipboardhelper;1'].getService(Ci.nsIClipboardHelper).copyString(selection);
         else
