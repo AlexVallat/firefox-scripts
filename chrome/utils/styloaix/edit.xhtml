@@ -97,8 +97,8 @@
       <button class="devtools-toolbarbutton" label="Insert" accesskey="I" type="menu">
         <menupopup>
           <menuitem label="Firefox chrome URL" accesskey="F" oncommand="insertCodeAtStart('@-moz-document url(\u0022' + _uc.BROWSERCHROME + '\u0022) {\n\n\n}')"/>
-          <menuitem label="Current Tab URL" accesskey="T" oncommand="insertCodeAtStart('@-moz-document url(\u0022' + Services.wm.getMostRecentBrowserWindow().gBrowser.currentURI.specIgnoringRef + '\u0022) {\n\n\n}')"/>
-          <menuitem label="Current Tab domain" accesskey="D" oncommand="let uri = Services.wm.getMostRecentBrowserWindow().gBrowser.currentURI; let host = uri.asciiHost; insertCodeAtStart('@-moz-document ' + (host ? 'domain' : 'url') + '(\u0022' + (host || uri.currentURI.specIgnoringRef) + '\u0022) {\n\n\n}')"/>
+          <menuitem label="Current Tab URL" accesskey="T" oncommand="let uri = getCurrentURI(); if (uri) insertCodeAtStart('@-moz-document url(\u0022' + uri.specIgnoringRef + '\u0022) {\n\n\n}')"/>
+          <menuitem label="Current Tab domain" accesskey="D" oncommand="let uri = getCurrentURI(); if (uri) { let host = uri.asciiHost; insertCodeAtStart('@-moz-document ' + (host ? 'domain' : 'url') + '(\u0022' + (host || uri.specIgnoringRef) + '\u0022) {\n\n\n}'); }"/>
           <menuitem label="HTML namespace as default" accesskey="H" oncommand="insertCodeAtStart('@namespace url(\u0022http://www.w3.org/1999/xhtml\u0022);')"/>
           <menuitem label="XUL namespace as default" accesskey="X" oncommand="insertCodeAtStart('@namespace url(\u0022http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul\u0022);');"/>
           <menuitem label="Chrome folder path" accesskey="C" oncommand="insertCodeAtCaret('resource://userchromejs/')"/>

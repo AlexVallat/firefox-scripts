@@ -4,20 +4,26 @@
 
 "use strict";
 
-const AutocompletePopup = require("resource://devtools/client/shared/autocomplete-popup.js");
+const AutocompletePopup = require('devtools/client/shared/autocomplete-popup');
 
-const { loader } = ChromeUtils.import('resource://devtools/shared/loader/Loader.jsm');
+let loader;
+try {
+  ({ loader } = ChromeUtils.importESModule('resource://devtools/shared/loader/Loader.sys.mjs'));
+} catch (e) {
+  // tb91
+  ({ loader } = ChromeUtils.importESModule('resource://devtools/shared/Loader.sys.mjs'));
+}
 
 loader.lazyRequireGetter(
   this,
   "KeyCodes",
-  "resource://devtools/client/shared/keycodes.js",
+  "devtools/client/shared/keycodes",
   true
 );
 loader.lazyRequireGetter(
   this,
   "CSSCompleter",
-  "resource://devtools/client/shared/sourceeditor/css-autocompleter.js"
+  "devtools/client/shared/sourceeditor/css-autocompleter"
 );
 
 const autocompleteMap = new WeakMap();
@@ -113,10 +119,10 @@ function initializeAutoCompletion(ctx, options = {}) {
   }
 
   autocompleteMap.set(ed, {
-    popup,
-    completer,
-    keyMap,
-    destroy,
+    popup: popup,
+    completer: completer,
+    keyMap: keyMap,
+    destroy: destroy,
     insertingSuggestion: false,
     suggestionInsertedOnce: false,
   });
@@ -158,8 +164,9 @@ function autoComplete({ ed, cm }) {
       // character "b". Thus we need to calculate the width of the entered part
       // of the token ("backgr" here).
 
-      const cursorElement =
-        cm.display.cursorDiv.querySelector(".CodeMirror-cursor");
+      const cursorElement = cm.display.cursorDiv.querySelector(
+        ".CodeMirror-cursor"
+      );
       const left = suggestions[0].preLabel.length * cm.defaultCharWidth();
       popup.hidePopup();
       popup.setItems(suggestions);
@@ -186,7 +193,10 @@ function insertPopupItem(ed, popupItem) {
     .split("")
     .reverse()
     .join("");
-  const backwardsPreLabel = preLabel.split("").reverse().join("");
+  const backwardsPreLabel = preLabel
+    .split("")
+    .reverse()
+    .join("");
 
   // If there is additional text in the preLabel vs the line, then
   // just insert the entire autocomplete text.  An example:

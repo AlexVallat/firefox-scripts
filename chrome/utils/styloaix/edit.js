@@ -1,6 +1,10 @@
-const { NetUtil } = ChromeUtils.import('resource://gre/modules/NetUtil.jsm');
+const { NetUtil } = ChromeUtils.importESModule('resource://gre/modules/NetUtil.sys.mjs');
 
-const { require } = ChromeUtils.import('resource://devtools/shared/loader/Loader.jsm');
+const { require } = ChromeUtils.importESModule('resource://devtools/shared/loader/Loader.sys.mjs');
+
+ChromeUtils.defineESModuleGetters(this, {
+  AppConstants: 'resource://gre/modules/AppConstants.sys.mjs',
+});
 
 docShell.cssErrorReportingEnabled = true;
 
@@ -16,6 +20,45 @@ let url;
 let type;
 let id;
 let style;
+
+function getCurrentURI() {
+  if (AppConstants.MOZ_APP_NAME === 'thunderbird') {
+    // Get main Thunderbird window, not the editor window
+    let win = Services.wm.getMostRecentWindow('mail:3pane');
+    if (!win)
+      win = Services.wm.getMostRecentWindow('mail:messageWindow');
+    if (!win)
+      win = Services.wm.getMostRecentWindow('msgcompose');
+    if (!win)
+      return null;
+
+    // Check if it's a compose window
+    if (win.location.href === 'chrome://messenger/content/messengercompose/messengercompose.xhtml') {
+      return win.document.documentURIObject;
+    }
+
+    // Check if it's a message window
+    if (win.location.href === 'chrome://messenger/content/messageWindow.xhtml') {
+      let browser = win.document.getElementById('messageBrowser');
+      return browser?.currentURI || win.document.documentURIObject;
+    }
+
+    // Main Thunderbird window (mail:3pane)
+    let tabmail = win.document.getElementById('tabmail');
+    if (tabmail) {
+      let currentTab = tabmail.selectedTab;
+      if (currentTab && currentTab.browser) {
+        return currentTab.browser.currentURI;
+      }
+    }
+
+    return null;
+  } else {
+    // Firefox
+    let win = Services.wm.getMostRecentBrowserWindow();
+    return (win && win.gBrowser) ? win.gBrowser.currentURI : null;
+  }
+}
 
 if (isChromeWindow) {
   let params = window.arguments[0];
@@ -396,7 +439,7 @@ function instantCheck (bool, persist) {
 
 function insertDataURI() {
   const fp = Cc['@mozilla.org/filepicker;1'].createInstance(Ci.nsIFilePicker);
-  fp.init(window, 'Choose File…', Ci.nsIFilePicker.modeOpen);
+  fp.init(window.browsingContext, 'Choose File…', Ci.nsIFilePicker.modeOpen);
   fp.open(res => {
     if (res != Ci.nsIFilePicker.returnOK)
       return;

@@ -214,13 +214,13 @@
 
       let newPageStyleBtn = _uc.createElement(doc, 'menuitem', {
         label: 'For this page',
-        oncommand: 'UC.styloaix.openEditor({url: gBrowser.currentURI.specIgnoringRef, type: "url"});'
+        oncommand: 'let uri = UC.styloaix.getCurrentURI(); uri ? UC.styloaix.openEditor({url: uri.specIgnoringRef, type: "url"}) : UC.styloaix.openEditor();'
       });
       newStylePopup.appendChild(newPageStyleBtn);
 
       let newSiteStyleBtn = _uc.createElement(doc, 'menuitem', {
         label: 'For this site',
-        oncommand: 'let host = gBrowser.currentURI.asciiHost; UC.styloaix.openEditor({url: host || gBrowser.currentURI.specIgnoringRef, type: host ? "domain" : "url"});'
+        oncommand: 'let uri = UC.styloaix.getCurrentURI(); if (uri) { let host = uri.asciiHost; UC.styloaix.openEditor({url: host || uri.specIgnoringRef, type: host ? "domain" : "url"}); } else { UC.styloaix.openEditor(); }'
       });
       newStylePopup.appendChild(newSiteStyleBtn);
 
@@ -331,7 +331,7 @@
       style.enabled = aStatus;
       _uc.windows((doc) => {
         let menuitem = doc.getElementById('styloaix-popup').getElementsByAttribute('styleid', style.fullName)[0];
-        menuitem?.setAttribute('checked', aStatus);
+        menuitem.setAttribute('checked', aStatus);
       });
       if (aStatus) {
         this.disabledStyles.delete(style.fullName);
@@ -390,6 +390,40 @@
       });
     },
 
+    getCurrentURI () {
+      if (AppConstants.MOZ_APP_NAME === 'thunderbird') {
+        let win = Services.wm.getMostRecentWindow(null);
+        if (!win)
+          return null;
+
+        // Check if it's a compose window
+        if (win.location.href === this.TBMAILCOMPOSEWIN) {
+          return win.document.documentURIObject;
+        }
+
+        // Check if it's a message window
+        if (win.location.href === this.TBDETACHEDMAIL) {
+          let browser = win.document.getElementById('messageBrowser');
+          return browser?.currentURI || win.document.documentURIObject;
+        }
+
+        // Main Thunderbird window (mail:3pane)
+        let tabmail = win.document.getElementById('tabmail');
+        if (tabmail) {
+          let currentTab = tabmail.selectedTab;
+          if (currentTab && currentTab.browser) {
+            return currentTab.browser.currentURI;
+          }
+        }
+
+        return null;
+      } else {
+        // Firefox
+        let win = Services.wm.getMostRecentBrowserWindow();
+        return (win && win.gBrowser) ? win.gBrowser.currentURI : null;
+      }
+    },
+
     openEditor ({id, url, type} = {}) {
       if (xPref.get(this.PREF_OPENINWINDOW)) {
         Services.wm.getMostRecentWindow(null).openDialog(this.EDITOR_URI, (id || Math.random()) + ' - StyloaiX Editor', 'centerscreen,chrome,resizable,dialog=no', {id, url, type});
@@ -439,10 +473,10 @@
             #styloaix-button.icon-colored {
               list-style-image: url('chrome://userchromejs/content/styloaix/16.png');
             }
-            .styloaix-usersheet .menu-iconic-accel {
+            .styloaix-usersheet .menu-accel {
               color: blue !important;
             }
-            .styloaix-agentsheet .menu-iconic-accel {
+            .styloaix-agentsheet .menu-accel {
               color: green !important;
             }
             #styloaix-button > label {
