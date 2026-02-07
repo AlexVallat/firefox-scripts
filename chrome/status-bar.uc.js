@@ -10,8 +10,8 @@
 const { CustomizableUI, StatusPanel } = window;
 
 UC.statusBar = {
-  PREF_ENABLED: 'userChromeJS.statusbar.enabled',
-  PREF_STATUSTEXT: 'userChromeJS.statusbar.appendStatusText',
+  PREF_ENABLED: "userChromeJS.statusbar.enabled",
+  PREF_STATUSTEXT: "userChromeJS.statusbar.appendStatusText",
 
   get enabled() {
     return xPref.get(this.PREF_ENABLED);
@@ -25,55 +25,55 @@ UC.statusBar = {
     xPref.set(this.PREF_ENABLED, true, true);
     xPref.set(this.PREF_STATUSTEXT, true, true);
     this.enabledListener = xPref.addListener(this.PREF_ENABLED, (isEnabled) => {
-      CustomizableUI.getWidget('status-dummybar').instances.forEach(dummyBar => {
-        dummyBar.node.setAttribute('collapsed', !isEnabled);
-      });
+      CustomizableUI.getWidget("status-dummybar").instances.forEach(
+        (dummyBar) => {
+          dummyBar.node.setAttribute("collapsed", !isEnabled);
+        },
+      );
     });
     this.textListener = xPref.addListener(this.PREF_STATUSTEXT, (isEnabled) => {
-      if (!UC.statusBar.enabled)
-        return;
+      if (!UC.statusBar.enabled) return;
 
       _uc.windows((doc, win) => {
         let StatusPanel = win.StatusPanel;
         if (isEnabled)
           win.statusbar.textNode.appendChild(StatusPanel._labelElement);
-        else
-          StatusPanel.panel.appendChild(StatusPanel._labelElement);
+        else StatusPanel.panel.appendChild(StatusPanel._labelElement);
       });
     });
 
     this.setStyle();
     _uc.sss.loadAndRegisterSheet(this.STYLE.url, this.STYLE.type);
 
-    CustomizableUI.registerArea('status-bar', {});
+    CustomizableUI.registerArea("status-bar", {});
 
-    Services.obs.addObserver(this, 'browser-delayed-startup-finished');
+    Services.obs.addObserver(this, "browser-delayed-startup-finished");
   },
 
   exec: function (win) {
     let document = win.document;
     let StatusPanel = win.StatusPanel;
 
-    let dummystatusbar = _uc.createElement(document, 'toolbar', {
-      id: 'status-dummybar',
-      toolbarname: 'Status Bar',
-      accesskey: 'S',
-      hidden: 'true'
+    let dummystatusbar = _uc.createElement(document, "toolbar", {
+      id: "status-dummybar",
+      toolbarname: "Status Bar",
+      accesskey: "S",
+      hidden: "true",
     });
     dummystatusbar.collapsed = !this.enabled;
     dummystatusbar.setAttribute = function (att, value) {
       let result = Element.prototype.setAttribute.apply(this, arguments);
 
-      if (att == 'collapsed') {
+      if (att == "collapsed") {
         let StatusPanel = win.StatusPanel;
         if (value === true) {
           xPref.set(UC.statusBar.PREF_ENABLED, false);
-          win.statusbar.node.setAttribute('collapsed', true);
+          win.statusbar.node.setAttribute("collapsed", true);
           StatusPanel.panel.appendChild(StatusPanel._labelElement);
-          win.statusbar.node.parentNode.collapsed = true;;
+          win.statusbar.node.parentNode.collapsed = true;
         } else {
           xPref.set(UC.statusBar.PREF_ENABLED, true);
-          win.statusbar.node.setAttribute('collapsed', false);
+          win.statusbar.node.setAttribute("collapsed", false);
           if (UC.statusBar.textInBar)
             win.statusbar.textNode.appendChild(StatusPanel._labelElement);
           win.statusbar.node.parentNode.collapsed = false;
@@ -84,56 +84,70 @@ UC.statusBar = {
     };
     win.gNavToolbox.appendChild(dummystatusbar);
 
-    win.statusbar.node = _uc.createElement(document, 'toolbar', {
-      id: 'status-bar',
-      customizable: 'true',
-      context: 'toolbar-context-menu',
-      mode: 'icons'
+    win.statusbar.node = _uc.createElement(document, "toolbar", {
+      id: "status-bar",
+      customizable: "true",
+      context: "toolbar-context-menu",
+      mode: "icons",
     });
 
-    win.statusbar.textNode = _uc.createElement(document, 'toolbaritem', {
-      id: 'status-text',
-      flex: '1',
-      width: '100'
+    win.statusbar.textNode = _uc.createElement(document, "toolbaritem", {
+      id: "status-text",
+      flex: "1",
+      width: "100",
     });
     if (this.textInBar)
       win.statusbar.textNode.appendChild(StatusPanel._labelElement);
     win.statusbar.node.appendChild(win.statusbar.textNode);
 
-    win.eval('Object.defineProperty(StatusPanel, "_label", {' + Object.getOwnPropertyDescriptor(StatusPanel, '_label').set.toString().replace(/^set _label/, 'set').replace(/((\s+)this\.panel\.setAttribute\("inactive", "true"\);)/, '$2this._labelElement.value = val;$1') + ', enumerable: true, configurable: true});');
+    if (this.originalLabelDescriptor) {
+      const original = this.originalLabelDescriptor;
+      Object.defineProperty(StatusPanel, "_label", {
+        ...original,
+        set(val) {
+          original.set.call(this, val);
+          if (!val) {
+            this._labelElement.value = val;
+          }
+        },
+      });
+    }
 
-    let bottomBox = document.createElement('vbox');
-    bottomBox.id = 'browser-bottombox';
+    let bottomBox = document.createElement("vbox");
+    bottomBox.id = "browser-bottombox";
     bottomBox.append(win.statusbar.node);
 
-    if (!this.enabled)
-      bottomBox.collapsed = true;
+    if (!this.enabled) bottomBox.collapsed = true;
 
-    document.getElementById('fullscreen-and-pointerlock-wrapper').insertAdjacentElement('afterend', bottomBox);
+    let before = document.getElementById("fullscreen-and-pointerlock-wrapper"); // works until Firefox 135.0b5
+    if (!before) before = document.getElementById("pointerlock-warning"); // required for Firefox 135.0b5 onward
+    before.insertAdjacentElement("afterend", bottomBox);
 
-    win.addEventListener('fullscreen', this.fsEvent);
+    win.addEventListener("fullscreen", this.fsEvent);
 
-    if (document.readyState === 'complete')
-      this.observe(win);
+    if (document.readyState === "complete") this.observe(win);
   },
 
   fsEvent: function (ev) {
     const { StatusPanel, fullScreen, statusbar } = ev.target;
-    if (fullScreen)
-      StatusPanel.panel.appendChild(StatusPanel._labelElement);
-    else
-      statusbar.textNode.appendChild(StatusPanel._labelElement);
+    if (fullScreen) StatusPanel.panel.appendChild(StatusPanel._labelElement);
+    else statusbar.textNode.appendChild(StatusPanel._labelElement);
   },
 
   observe: function (win) {
     CustomizableUI.registerToolbarNode(win.statusbar.node);
   },
 
-  orig: Object.getOwnPropertyDescriptor(StatusPanel, '_label').set.toString(),
+  originalLabelDescriptor: Object.getOwnPropertyDescriptor(
+    StatusPanel,
+    "_label",
+  ),
 
   setStyle: function () {
     this.STYLE = {
-      url: Services.io.newURI('data:text/css;charset=UTF-8,' + encodeURIComponent(`
+      url: Services.io.newURI(
+        "data:text/css;charset=UTF-8," +
+          encodeURIComponent(`
         @-moz-document url('${_uc.BROWSERCHROME}') {
           #status-bar {
             color: initial !important;
@@ -165,29 +179,36 @@ UC.statusBar = {
             visibility: collapse !important;
           }
         }
-      `)),
-      type: _uc.sss.USER_SHEET
-    }
+      `),
+      ),
+      type: _uc.sss.USER_SHEET,
+    };
   },
-  
+
   destroy: function () {
     const { CustomizableUI } = Services.wm.getMostRecentBrowserWindow();
 
     xPref.removeListener(this.enabledListener);
     xPref.removeListener(this.textListener);
-    CustomizableUI.unregisterArea('status-bar');
+    CustomizableUI.unregisterArea("status-bar");
     _uc.sss.unregisterSheet(this.STYLE.url, this.STYLE.type);
     _uc.windows((doc, win) => {
-      const { eval, statusbar, StatusPanel } = win;
-      eval('Object.defineProperty(StatusPanel, "_label", {' + this.orig.replace(/^set _label/, 'set') + ', enumerable: true, configurable: true});');
+      const { statusbar, StatusPanel } = win;
+      if (this.originalLabelDescriptor) {
+        Object.defineProperty(
+          StatusPanel,
+          "_label",
+          this.originalLabelDescriptor,
+        );
+      }
       StatusPanel.panel.appendChild(StatusPanel._labelElement);
-      doc.getElementById('status-dummybar').remove();
+      doc.getElementById("status-dummybar").remove();
       statusbar.node.remove();
-      win.removeEventListener('fullscreen', this.fsEvent);
+      win.removeEventListener("fullscreen", this.fsEvent);
     });
-    Services.obs.removeObserver(this, 'browser-delayed-startup-finished');
+    Services.obs.removeObserver(this, "browser-delayed-startup-finished");
     delete UC.statusBar;
-  }
-}
+  },
+};
 
 UC.statusBar.init();
