@@ -1,11 +1,11 @@
- /* This Source Code Form is subject to the terms of the Mozilla Public
+/* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
-"use strict";
+'use strict';
 
-import { RDFDataSource } from "chrome://userchromejs/content/RDFDataSource.sys.mjs";
+import {RDFDataSource} from 'chrome://userchromejs/content/RDFDataSource.sys.mjs';
 
-const RDFURI_INSTALL_MANIFEST_ROOT = "urn:mozilla:install-manifest";
+const RDFURI_INSTALL_MANIFEST_ROOT = 'urn:mozilla:install-manifest';
 
 function EM_R(aProperty) {
   return `http://www.mozilla.org/2004/em-rdf#${aProperty}`;
@@ -31,8 +31,8 @@ class Manifest {
 
 export class InstallRDF extends Manifest {
   _readProps(source, obj, props) {
-    for (let prop of props) {
-      let val = getProperty(source, prop);
+    for (const prop of props) {
+      const val = getProperty(source, prop);
       if (val != null) {
         obj[prop] = val;
       }
@@ -40,60 +40,80 @@ export class InstallRDF extends Manifest {
   }
 
   _readArrayProp(source, obj, prop, target, decode = getValue) {
-    let result = Array.from(source.getObjects(EM_R(prop)),
-                            target => decode(target));
+    const result = Array.from(source.getObjects(EM_R(prop)), target => decode(target));
     if (result.length) {
       obj[target] = result;
     }
   }
 
   _readArrayProps(source, obj, props, decode = getValue) {
-    for (let [prop, target] of Object.entries(props)) {
+    for (const [prop, target] of Object.entries(props)) {
       this._readArrayProp(source, obj, prop, target, decode);
     }
   }
 
   _readLocaleStrings(source, obj) {
-    this._readProps(source, obj, ["name", "description", "creator", "homepageURL"]);
+    this._readProps(source, obj, ['name', 'description', 'creator', 'homepageURL']);
     this._readArrayProps(source, obj, {
-      locale: "locales",
-      developer: "developers",
-      translator: "translators",
-      contributor: "contributors",
+      locale: 'locales',
+      developer: 'developers',
+      translator: 'translators',
+      contributor: 'contributors',
     });
   }
 
   decode() {
-    let root = this.ds.getResource(RDFURI_INSTALL_MANIFEST_ROOT);
-    let result = {};
+    const root = this.ds.getResource(RDFURI_INSTALL_MANIFEST_ROOT);
+    const result = {};
 
-    let props = ["id", "version", "type", "updateURL", "optionsURL",
-                 "optionsType", "aboutURL", "iconURL",
-                 "bootstrap", "unpack", "strictCompatibility"];
+    const props = [
+      'id',
+      'version',
+      'type',
+      'updateURL',
+      'optionsURL',
+      'optionsType',
+      'aboutURL',
+      'iconURL',
+      'bootstrap',
+      'unpack',
+      'strictCompatibility',
+    ];
     this._readProps(root, result, props);
 
-    let decodeTargetApplication = source => {
-      let app = {};
-      this._readProps(source, app, ["id", "minVersion", "maxVersion"]);
+    const decodeTargetApplication = source => {
+      const app = {};
+      this._readProps(source, app, ['id', 'minVersion', 'maxVersion']);
       return app;
     };
 
-    let decodeLocale = source => {
-      let localized = {};
+    const decodeLocale = source => {
+      const localized = {};
       this._readLocaleStrings(source, localized);
       return localized;
     };
 
     this._readLocaleStrings(root, result);
 
-    this._readArrayProps(root, result, {"targetPlatform": "targetPlatforms"});
-    this._readArrayProps(root, result, {"targetApplication": "targetApplications"},
-                         decodeTargetApplication);
-    this._readArrayProps(root, result, {"localized": "localized"},
-                         decodeLocale);
-    this._readArrayProps(root, result, {"dependency": "dependencies"},
-                         source => getProperty(source, "id"));
+    this._readArrayProps(root, result, {targetPlatform: 'targetPlatforms'});
+    this._readArrayProps(
+      root,
+      result,
+      {targetApplication: 'targetApplications'},
+      decodeTargetApplication
+    );
+    this._readArrayProps(root, result, {localized: 'localized'}, decodeLocale);
+    this._readArrayProps(root, result, {dependency: 'dependencies'}, source =>
+      getProperty(source, 'id')
+    );
 
+    return result;
+  }
+
+  getProps(props) {
+    const root = this.ds.getResource(RDFURI_INSTALL_MANIFEST_ROOT);
+    const result = {};
+    this._readProps(root, result, props);
     return result;
   }
 }

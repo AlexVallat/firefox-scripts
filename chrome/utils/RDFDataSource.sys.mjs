@@ -1,19 +1,19 @@
- /* This Source Code Form is subject to the terms of the Mozilla Public
+/* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 /**
  * This module creates a new API for accessing and modifying RDF graphs. The
- * goal is to be able to serialise the graph in a human readable form. Also
- * if the graph was originally loaded from an RDF/XML the serialisation should
+ * goal is to be able to serialise the graph in a human readable form. Also if
+ * the graph was originally loaded from an RDF/XML the serialisation should
  * closely match the original with any new data closely following the existing
  * layout. The output should always be compatible with Mozilla's RDF parser.
  *
  * This is all achieved by using a DOM Document to hold the current state of the
- * graph in XML form. This can be initially loaded and parsed from disk or
- * a blank document used for an empty graph. As assertions are added to the
- * graph, appropriate DOM nodes are added to the document to represent them
- * along with any necessary whitespace to properly layout the XML.
+ * graph in XML form. This can be initially loaded and parsed from disk or a
+ * blank document used for an empty graph. As assertions are added to the graph,
+ * appropriate DOM nodes are added to the document to represent them along with
+ * any necessary whitespace to properly layout the XML.
  *
  * In general the order of adding assertions to the graph will impact the form
  * the serialisation takes. If a resource is first added as the object of an
@@ -22,10 +22,10 @@
  * then it will be serialised at the top level of the XML.
  */
 
-const NS_XML = "http://www.w3.org/XML/1998/namespace";
-const NS_XMLNS = "http://www.w3.org/2000/xmlns/";
-const NS_RDF = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
-const NS_NC = "http://home.netscape.com/NC-rdf#";
+const NS_XML = 'http://www.w3.org/XML/1998/namespace';
+const NS_XMLNS = 'http://www.w3.org/2000/xmlns/';
+const NS_RDF = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
+const NS_NC = 'http://home.netscape.com/NC-rdf#';
 
 /* eslint prefer-template: 1 */
 
@@ -33,7 +33,7 @@ function isElement(obj) {
   return Element.isInstance(obj);
 }
 function isText(obj) {
-  return obj && typeof obj == "object" && ChromeUtils.getClassName(obj) == "Text";
+  return obj && typeof obj == 'object' && ChromeUtils.getClassName(obj) == 'Text';
 }
 
 /**
@@ -41,16 +41,12 @@ function isText(obj) {
  * value. Returns null if neither exists,
  */
 function getRDFAttribute(element, name) {
-  if (element.hasAttributeNS(NS_RDF, name))
-    return element.getAttributeNS(NS_RDF, name);
-  if (element.hasAttribute(name))
-    return element.getAttribute(name);
+  if (element.hasAttributeNS(NS_RDF, name)) return element.getAttributeNS(NS_RDF, name);
+  if (element.hasAttribute(name)) return element.getAttribute(name);
   return undefined;
 }
 
-/**
- * Represents an assertion in the datasource
- */
+/** Represents an assertion in the datasource */
 class RDFAssertion {
   constructor(subject, predicate, object) {
     // The subject on this assertion, an RDFSubject
@@ -79,14 +75,11 @@ class RDFAssertion {
 
 class RDFNode {
   equals(rdfnode) {
-    return (rdfnode.constructor === this.constructor &&
-            rdfnode._value == this._value);
+    return rdfnode.constructor === this.constructor && rdfnode._value == this._value;
   }
 }
 
-/**
- * A simple literal value
- */
+/** A simple literal value */
 export class RDFLiteral extends RDFNode {
   constructor(value) {
     super();
@@ -98,9 +91,7 @@ export class RDFLiteral extends RDFNode {
   }
 }
 
-/**
- * This is an RDF node that can be a subject so a resource or a blank node
- */
+/** This is an RDF node that can be a subject so a resource or a blank node */
 class RDFSubject extends RDFNode {
   constructor(ds) {
     super();
@@ -114,38 +105,37 @@ class RDFSubject extends RDFNode {
     this._elements = [];
   }
 
-  /**
-   * Parses the given Element from the DOM document
-   */
-  /* eslint-disable complexity */
+  /** Parses the given Element from the DOM document */
+
   _parseElement(element) {
     this._elements.push(element);
 
     // There might be an inferred rdf:type assertion in the element name
-    if (element.namespaceURI != NS_RDF ||
-        element.localName != "Description") {
-      var assertion = new RDFAssertion(this, RDF_R("type"),
-                                       this._ds.getResource(element.namespaceURI + element.localName));
+    if (element.namespaceURI != NS_RDF || element.localName != 'Description') {
+      var assertion = new RDFAssertion(
+        this,
+        RDF_R('type'),
+        this._ds.getResource(element.namespaceURI + element.localName)
+      );
       assertion._DOMnode = element;
       assertion._isSubjectElement = true;
       this._addAssertion(assertion);
     }
 
     // Certain attributes can be literal properties
-    for (let attr of element.attributes) {
-      if (attr.namespaceURI == NS_XML || attr.namespaceURI == NS_XMLNS ||
-          attr.nodeName == "xmlns")
+    for (const attr of element.attributes) {
+      if (attr.namespaceURI == NS_XML || attr.namespaceURI == NS_XMLNS || attr.nodeName == 'xmlns')
         continue;
-      if ((attr.namespaceURI == NS_RDF || !attr.namespaceURI) &&
-          (["nodeID", "about", "resource", "ID", "parseType"].includes(attr.localName)))
+      if (
+        (attr.namespaceURI == NS_RDF || !attr.namespaceURI) &&
+        ['nodeID', 'about', 'resource', 'ID', 'parseType'].includes(attr.localName)
+      )
         continue;
       var object = null;
       if (attr.namespaceURI == NS_RDF) {
-        if (attr.localName == "type")
-          object = this._ds.getResource(attr.nodeValue);
+        if (attr.localName == 'type') object = this._ds.getResource(attr.nodeValue);
       }
-      if (!object)
-        object = new RDFLiteral(attr.nodeValue);
+      if (!object) object = new RDFLiteral(attr.nodeValue);
       assertion = new RDFAssertion(this, attr.namespaceURI + attr.localName, object);
       assertion._DOMnode = attr;
       this._addAssertion(assertion);
@@ -155,37 +145,34 @@ class RDFSubject extends RDFNode {
     element.listCounter = 1;
     while (child) {
       if (isElement(child)) {
+        // eslint-disable-next-line no-useless-assignment
         object = null;
         var predicate = child.namespaceURI + child.localName;
         if (child.namespaceURI == NS_RDF) {
-          if (child.localName == "li") {
+          if (child.localName == 'li') {
             predicate = RDF_R(`_${element.listCounter}`);
             element.listCounter++;
           }
         }
 
         // Check for and bail out on unknown attributes on the property element
-        for (let attr of child.attributes) {
+        for (const attr of child.attributes) {
           // Ignore XML namespaced attributes
-          if (attr.namespaceURI == NS_XML)
-            continue;
+          if (attr.namespaceURI == NS_XML) continue;
           // These are reserved by XML for future use
-          if (attr.localName.substring(0, 3).toLowerCase() == "xml")
-            continue;
+          if (attr.localName.substring(0, 3).toLowerCase() == 'xml') continue;
           // We can handle these RDF attributes
-          if ((!attr.namespaceURI || attr.namespaceURI == NS_RDF) &&
-              ["resource", "nodeID"].includes(attr.localName))
+          if (
+            (!attr.namespaceURI || attr.namespaceURI == NS_RDF) &&
+            ['resource', 'nodeID'].includes(attr.localName)
+          )
             continue;
           // This is a special attribute we handle for compatibility with Mozilla RDF
-          if (attr.namespaceURI == NS_NC &&
-              attr.localName == "parseType")
-            continue;
+          if (attr.namespaceURI == NS_NC && attr.localName == 'parseType') continue;
         }
 
-        var parseType = child.getAttributeNS(NS_NC, "parseType");
-
-        var resource = getRDFAttribute(child, "resource");
-        var nodeID = getRDFAttribute(child, "nodeID");
+        var resource = getRDFAttribute(child, 'resource');
+        var nodeID = getRDFAttribute(child, 'nodeID');
 
         if (resource !== undefined) {
           var base = Services.io.newURI(element.baseURI);
@@ -193,12 +180,11 @@ class RDFSubject extends RDFNode {
         } else if (nodeID !== undefined) {
           object = this._ds.getBlankNode(nodeID);
         } else {
-          var hasText = false;
           var childElement = null;
           var subchild = child.firstChild;
           while (subchild) {
             if (isText(subchild) && /\S/.test(subchild.nodeValue)) {
-              hasText = true;
+              //
             } else if (isElement(subchild)) {
               childElement = subchild;
             }
@@ -208,8 +194,7 @@ class RDFSubject extends RDFNode {
           if (childElement) {
             object = this._ds._getSubjectForElement(childElement);
             object._parseElement(childElement);
-          } else
-            object = new RDFLiteral(child.textContent);
+          } else object = new RDFLiteral(child.textContent);
         }
 
         assertion = new RDFAssertion(this, predicate, object);
@@ -219,53 +204,43 @@ class RDFSubject extends RDFNode {
       child = child.nextSibling;
     }
   }
-  /* eslint-enable complexity */
 
   /**
-   * Adds a new assertion to the internal hashes. Should be called for every
-   * new assertion parsed or created programmatically.
+   * Adds a new assertion to the internal hashes. Should be called for every new
+   * assertion parsed or created programmatically.
    */
   _addAssertion(assertion) {
     var predicate = assertion.getPredicate();
-    if (predicate in this._assertions)
-      this._assertions[predicate].push(assertion);
-    else
-      this._assertions[predicate] = [ assertion ];
+    if (predicate in this._assertions) this._assertions[predicate].push(assertion);
+    else this._assertions[predicate] = [assertion];
 
     var object = assertion.getObject();
     if (object instanceof RDFSubject) {
       // Create reverse assertion
-      if (predicate in object._backwards)
-        object._backwards[predicate].push(assertion);
-      else
-        object._backwards[predicate] = [ assertion ];
+      if (predicate in object._backwards) object._backwards[predicate].push(assertion);
+      else object._backwards[predicate] = [assertion];
     }
   }
 
   /**
-   * Returns all objects in assertions with this subject and the given predicate.
+   * Returns all objects in assertions with this subject and the given
+   * predicate.
    */
   getObjects(predicate) {
     if (predicate in this._assertions)
-      return Array.from(this._assertions[predicate],
-                        i => i.getObject());
+      return Array.from(this._assertions[predicate], i => i.getObject());
 
     return [];
   }
 
-  /**
-   * Retrieves the first property value for the given predicate.
-   */
+  /** Retrieves the first property value for the given predicate. */
   getProperty(predicate) {
-    if (predicate in this._assertions)
-      return this._assertions[predicate][0].getObject();
+    if (predicate in this._assertions) return this._assertions[predicate][0].getObject();
     return null;
   }
 }
 
-/**
- * Creates a new RDFResource for the datasource. Private.
- */
+/** Creates a new RDFResource for the datasource. Private. */
 export class RDFResource extends RDFSubject {
   constructor(ds, uri) {
     super(ds);
@@ -274,9 +249,7 @@ export class RDFResource extends RDFSubject {
   }
 }
 
-/**
- * Creates a new blank node. Private.
- */
+/** Creates a new blank node. Private. */
 export class RDFBlankNode extends RDFSubject {
   constructor(ds, nodeID) {
     super(ds);
@@ -284,17 +257,14 @@ export class RDFBlankNode extends RDFSubject {
     this._nodeID = nodeID;
   }
 
-  /**
-   * Sets attributes on the DOM element to mark it as representing this node
-   */
+  /** Sets attributes on the DOM element to mark it as representing this node */
   _applyToElement(element) {
-    if (!this._nodeID)
-      return;
+    if (!this._nodeID) return;
     if (USE_RDFNS_ATTR) {
-      var prefix = this._ds._resolvePrefix(element, RDF_R("nodeID"));
+      var prefix = this._ds._resolvePrefix(element, RDF_R('nodeID'));
       element.setAttributeNS(prefix.namespaceURI, prefix.qname, this._nodeID);
     } else {
-      element.setAttribute("nodeID", this._nodeID);
+      element.setAttribute('nodeID', this._nodeID);
     }
   }
 
@@ -307,50 +277,42 @@ export class RDFBlankNode extends RDFSubject {
     // a nodeID to match them
     if (!this._nodeID && this._elements.length > 0) {
       this._ds._createNodeID(this);
-      for (let element of this._elements)
-        this._applyToElement(element);
+      for (const element of this._elements) this._applyToElement(element);
     }
 
     return super._createNewElement.call(uri);
   }
 
-  /**
-   * Adds a reference to this node to the given property Element.
-   */
+  /** Adds a reference to this node to the given property Element. */
   _addReferenceToElement(element) {
     if (this._elements.length > 0 && !this._nodeID) {
       // In document elsewhere already
       // Create a node ID and update the other nodes referencing
       this._ds._createNodeID(this);
-      for (let element of this._elements)
-        this._applyToElement(element);
+      for (const element of this._elements) this._applyToElement(element);
     }
 
     if (this._nodeID) {
       if (USE_RDFNS_ATTR) {
-        let prefix = this._ds._resolvePrefix(element, RDF_R("nodeID"));
+        const prefix = this._ds._resolvePrefix(element, RDF_R('nodeID'));
         element.setAttributeNS(prefix.namespaceURI, prefix.qname, this._nodeID);
       } else {
-        element.setAttribute("nodeID", this._nodeID);
+        element.setAttribute('nodeID', this._nodeID);
       }
     } else {
       // Add the empty blank node, this is generally right since further
       // assertions will be added to fill this out
-      var newelement = this._ds._addElement(element, RDF_R("Description"));
+      var newelement = this._ds._addElement(element, RDF_R('Description'));
       newelement.listCounter = 1;
       this._elements.push(newelement);
     }
   }
 
-    /**
-     * Removes any reference to this node from the given property Element.
-     */
-    _removeReferenceFromElement(element) {
-      if (element.hasAttributeNS(NS_RDF, "nodeID"))
-        element.removeAttributeNS(NS_RDF, "nodeID");
-      if (element.hasAttribute("nodeID"))
-        element.removeAttribute("nodeID");
-    }
+  /** Removes any reference to this node from the given property Element. */
+  _removeReferenceFromElement(element) {
+    if (element.hasAttributeNS(NS_RDF, 'nodeID')) element.removeAttributeNS(NS_RDF, 'nodeID');
+    if (element.hasAttribute('nodeID')) element.removeAttribute('nodeID');
+  }
 
   getNodeID() {
     return this._nodeID;
@@ -375,8 +337,8 @@ export class RDFDataSource {
   }
 
   static loadFromString(text) {
-    let parser = new DOMParser();
-    let document = parser.parseFromString(text, "application/xml");
+    const parser = new DOMParser();
+    const document = parser.parseFromString(text, 'application/xml');
 
     return new this(document);
   }
@@ -386,18 +348,16 @@ export class RDFDataSource {
    * been seen before a new one is created.
    */
   _getSubjectForElement(element) {
-    var about = getRDFAttribute(element, "about");
+    var about = getRDFAttribute(element, 'about');
 
     if (about !== undefined) {
-      let base = Services.io.newURI(element.baseURI);
+      const base = Services.io.newURI(element.baseURI);
       return this.getResource(base.resolve(about));
     }
     return this.getBlankNode(null);
   }
 
-  /**
-   * Parses the document for subjects at the top level.
-   */
+  /** Parses the document for subjects at the top level. */
   _parseDocument() {
     var domnode = this._document.documentElement.firstChild;
     while (domnode) {
@@ -410,8 +370,9 @@ export class RDFDataSource {
   }
 
   /**
-   * Gets a blank node. nodeID may be null and if so a new blank node is created.
-   * If a nodeID is given then the blank node with that ID is returned or created.
+   * Gets a blank node. nodeID may be null and if so a new blank node is
+   * created. If a nodeID is given then the blank node with that ID is returned
+   * or created.
    */
   getBlankNode(nodeID) {
     var rdfnode = new RDFBlankNode(this, nodeID);
@@ -424,8 +385,7 @@ export class RDFDataSource {
    * used already.
    */
   getResource(uri) {
-    if (uri in this._resources)
-      return this._resources[uri];
+    if (uri in this._resources) return this._resources[uri];
 
     var resource = new RDFResource(this, uri);
     this._resources[uri] = resource;
